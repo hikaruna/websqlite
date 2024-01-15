@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en-us">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+</head>
+
+<body>
+  <form>
+    <input id="sql-text">
+  </form>
+
+  <ul id="result-list">
+  </ul>
+  <template id="result-template">
+    <p></p>
+    <textarea></textarea>
+  </template>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "@sqlite.org/sqlite-wasm": "https://unpkg.com/@sqlite.org/sqlite-wasm@3.44.2-build1/sqlite-wasm/jswasm/sqlite3.mjs"
+      }
+    }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+
+</html>
