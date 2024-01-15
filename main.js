@@ -1,5 +1,6 @@
 //@ts-check
-import {default as sqlite3InitModule} from "@sqlite.org/sqlite-wasm"
+import { Grid, html } from "gridjs"
+import { default as sqlite3InitModule } from "@sqlite.org/sqlite-wasm"
 
 const sqlite3 = await sqlite3InitModule();
 console.log("Loaded sqlite3", sqlite3);
@@ -10,22 +11,53 @@ window.db = db;
 const resultList = /** @type {HTMLUListElement} */ (document.querySelector("#result-list"));
 const resultTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#result-template"));
 const sqlField = /** @type {HTMLInputElement} */ (document.getElementById("sql-text"));
-const execButton = /** @type {HTMLButtonElement} */ (document.getElementById('exec-button'));
 
 /**
  * 
  * @param {Event} e 
  */
 function execSql(e) {
-  const result = db.exec(sqlField.value, {returnValue: 'resultRows'});
+  const result = db.selectObjects(sqlField.value);
 
-  const clone = /** @type {HTMLElement} */ (resultTemplate.content.cloneNode(true));
+  const clone = /** @type {DocumentFragment} */ (resultTemplate.content.cloneNode(true));
   /** @type {HTMLParagraphElement} */ (clone.querySelector('p')).textContent = sqlField.value;
-  /** @type {HTMLTextAreaElement} */ (clone.querySelector('textarea')).value = JSON.stringify(result);
-  resultList.appendChild(clone);
+  const table = /** @type {HTMLTableElement} */ (clone.querySelector('table'));
+  if (result.length > 0) {
+    const firstRow = result[0];
+    table.appendChild((() => {
+      const tr = document.createElement('tr');
+
+      for (const column of Object.keys(firstRow)) {
+        tr.appendChild((() => {
+          const th = document.createElement('th');
+          th.textContent = column;
+          return th;
+        })());
+      }
+
+      return tr;
+    })());
+  }
+
+  for (const row of result) {
+    table.appendChild((() => {
+      const tr = document.createElement('tr');
+
+      for (const value of Object.values(row)) {
+        tr.appendChild((() => {
+          const td = document.createElement('td');
+          td.textContent = `${value}`;
+          return td;
+        })());
+      }
+
+      return tr;
+    })());
+  }
+
+  resultList.insertAdjacentElement('afterbegin', /** @type {Element} */ (clone.firstElementChild));
   console.log(result);
   sqlField.value = '';
-  e.preventDefault();
 };
-
-/** @type {HTMLFormElement} */(document.getElementsByTagName('form')[0]).onsubmit = execSql;
+// @ts-ignore
+window.execSql = execSql;

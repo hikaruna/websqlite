@@ -5,24 +5,33 @@
   <meta charset="utf-8">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+  <link rel="stylesheet" href="https://unpkg.com/mvp.css">
 </head>
 
 <body>
-  <form>
-    <input id="sql-text">
-  </form>
+  <section>
+    <form onsubmit="execSql(); return false;">
+      <input id="sql-text"><button>exec</button>
+    </form>
+  </section>
 
-  <ul id="result-list">
-  </ul>
-  <template id="result-template">
-    <p></p>
-    <textarea></textarea>
-  </template>
+  <section>
+    <ul id="result-list">
+    </ul>
+
+    <template id="result-template">
+      <li>
+        <p></p>
+        <table></table>
+      </li>
+    </template>
+  </section>
 
   <script type="importmap">
     {
       "imports": {
-        "@sqlite.org/sqlite-wasm": "https://unpkg.com/@sqlite.org/sqlite-wasm@3.44.2-build1/sqlite-wasm/jswasm/sqlite3.mjs"
+        "@sqlite.org/sqlite-wasm": "https://unpkg.com/@sqlite.org/sqlite-wasm@3.44.2-build1/sqlite-wasm/jswasm/sqlite3.mjs",
+        "gridjs": "https://unpkg.com/gridjs?module"
       }
     }
   </script>
