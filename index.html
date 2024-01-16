@@ -22,7 +22,7 @@
   </section>
 
   <section>
-    <form onsubmit="execSql(); return false;">
+    <form onsubmit="try { execSql();} finally { return false; }">
       <input id="sql-text"><button>exec</button>
     </form>
   </section>
@@ -30,13 +30,6 @@
   <section>
     <ul id="result-list">
     </ul>
-
-    <template id="result-template">
-      <li>
-        <p></p>
-        <table></table>
-      </li>
-    </template>
   </section>
 
   <script type="importmap">

@@ -1,5 +1,7 @@
 import { default as sqlite3InitModule } from "@sqlite.org/sqlite-wasm"
 import { DbTables } from './src/DbTables.js';
+import { DbTable } from "./src/DbTable.js";
+import { html, render } from "lit";
 
 
 const sqlite3 = await sqlite3InitModule();
@@ -13,7 +15,7 @@ function showTables() {
   const dbTables = /** @type {DbTables} */ (document.querySelector('#db-tables'));
   const myTables /** @type {import("./src/DbTables.js").Table[]} */ = tableNames.map(tableName => {
     const columns = /** @type {String[]} */ (db.selectValues(`SELECT name FROM pragma_table_info('${tableName}')`));
-    const rows = db.selectObjects(`SELECT ${columns.join(', ')} FROM ${tableName}`).map(row => ({ ...row}))
+    const rows = db.selectObjects(`SELECT ${columns.join(', ')} FROM ${tableName}`).map(row => ({ ...row }))
     return {
       name: tableName,
       columns,
@@ -40,64 +42,49 @@ function execSql(e) {
 
   try {
 
-    const result = db.selectObjects(sqlField.value);
+    const result = (() => {
 
-    const clone = /** @type {DocumentFragment} */ (resultTemplate.content.cloneNode(true));
-    const p = /** @type {HTMLParagraphElement} */ (clone.querySelector('p'));
-    p.textContent = sqlField.value;
-
-    const table = /** @type {HTMLTableElement} */ (clone.querySelector('table'));
-    if (result.length > 0) {
-      const firstRow = result[0];
-      table.appendChild((() => {
-        const tr = document.createElement('tr');
-
-        for (const column of Object.keys(firstRow)) {
-          tr.appendChild((() => {
-            const th = document.createElement('th');
-            th.textContent = column;
-            return th;
-          })());
+      const stmt = db.prepare(sqlField.value);
+      try {
+        const columns = stmt.getColumnNames();
+        const rows = [];
+        while (stmt.step()) {
+          const row = stmt.get({});
+          rows.push(row);
         }
 
-        return tr;
-      })());
-    }
-
-    for (const row of result) {
-      table.appendChild((() => {
-        const tr = document.createElement('tr');
-
-        for (const value of Object.values(row)) {
-          tr.appendChild((() => {
-            const td = document.createElement('td');
-            td.textContent = `${value}`;
-            return td;
-          })());
+        return {
+          name: sqlField.value,
+          columns,
+          rows,
         }
+      } finally {
+        stmt.finalize();
+      }
+    })();
 
-        return tr;
-      })());
-    }
+    const dbTableElm = /** @type {DbTable} */(document.createElement('db-table'));
+    dbTableElm.name = result.name;
+    dbTableElm.columns = result.columns;
+    dbTableElm.rows = result.rows;
 
-    resultList.insertAdjacentElement('afterbegin', /** @type {Element} */(clone.firstElementChild));
+    const liElm = document.createElement('li');
+    liElm.appendChild(dbTableElm);
+
+    resultList.insertAdjacentElement('afterbegin', liElm);
     console.log(result);
     sqlField.value = '';
     showTables();
   } catch (e) {
     switch (true) {
       case e instanceof sqlite3.SQLite3Error:
+        const liElm = document.createElement('li');
+        render(html`
+          <p>${sqlField.value}</p>
+          <p>${e.message}</p>
+        `, liElm);
 
-        const clone = /** @type {DocumentFragment} */ (resultTemplate.content.cloneNode(true));
-        const p = /** @type {HTMLParagraphElement} */ (clone.querySelector('p'));
-        p.textContent = sqlField.value;
-        clone.firstElementChild?.appendChild((() => {
-          const p = document.createElement('p');
-          p.textContent = e.message;
-          return p;
-        })());
-
-        resultList.insertAdjacentElement('afterbegin', /** @type {Element} */(clone.firstElementChild));
+        resultList.insertAdjacentElement('afterbegin', liElm);
         sqlField.value = '';
         console.error(e);
         break;
@@ -138,7 +125,7 @@ function importDb() {
     const arrayBuffer = /** @type {ArrayBuffer} */(this.result);
     const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);
     const memDb = new sqlite3.oo1.DB();
-    memDb.onclose = {after: function(){sqlite3.wasm.dealloc(p)}};
+    memDb.onclose = { after: function () { sqlite3.wasm.dealloc(p) } };
     const rc = sqlite3.capi.sqlite3_deserialize(
         /** @type {Number} */(memDb.pointer), 'main', p, arrayBuffer.byteLength, arrayBuffer.byteLength,
       sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
