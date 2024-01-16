@@ -1,4 +1,3 @@
-//@ts-check
 import { Grid, html } from "gridjs"
 import { default as sqlite3InitModule } from "@sqlite.org/sqlite-wasm"
 
@@ -130,3 +129,67 @@ function execSql(e) {
 };
 // @ts-ignore
 window.execSql = execSql;
+
+function exportDb() {
+  const byteArray = sqlite3.capi.sqlite3_js_db_export(db);
+  const blob = new Blob([byteArray.buffer],
+    { type: "application/x-sqlite3" });
+  const a = document.createElement('a');
+  document.body.appendChild(a);
+  a.href = window.URL.createObjectURL(blob);
+  a.download = ("my.sqlite3");
+  a.addEventListener('click', function () {
+    setTimeout(function () {
+      console.log("Exported (possibly auto-downloaded) database");
+      window.URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 500);
+  });
+  a.click();
+}
+// @ts-ignore
+window.exportDb = exportDb;
+
+function importDb() {
+  const loadDbForm = /** @type {HTMLInputElement} */ (document.querySelector('#load-db'));
+  const f = loadDbForm.files?.[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.addEventListener('load', function () {
+    const arrayBuffer = /** @type {ArrayBuffer} */(this.result);
+    const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);
+    const memDb = new sqlite3.oo1.DB();
+    const rc = sqlite3.capi.sqlite3_deserialize(
+        /** @type {Number} */(memDb.pointer), 'main', p, arrayBuffer.byteLength, arrayBuffer.byteLength,
+      sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
+    );
+    memDb.checkRc(rc);
+
+    try {
+      memDb.exec("VACUUM INTO 'file:local?vfs=kvvfs'");
+    } catch (e) {
+      switch (true) {
+        case e instanceof sqlite3.SQLite3Error:
+          console.error(e);
+          alert(e.message);
+          break;
+        default:
+          throw e;
+      }
+    }
+
+  });
+  r.readAsArrayBuffer(f);
+}
+// @ts-ignore
+window.importDb = importDb;
+
+function clearDb() {
+  const result = confirm('本当に？');
+
+  if (result) {
+    db.clearStorage();
+  }
+}
+// @ts-ignore
+window.clearDb = clearDb;

@@ -9,6 +9,13 @@
 </head>
 
 <body>
+  <nav>
+    <ul>
+      <li><button onclick="exportDb()">exportDb</button></li>
+      <li><button onclick="clearDb()">clearDb</button></li>
+      <li><input type='file' id='load-db' onchange="importDb()"/></li>
+    </ul>
+  </nav>
   <section id="tables">
     <ul>
     </ul>
