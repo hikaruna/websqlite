@@ -1,5 +1,6 @@
-import { Grid, html } from "gridjs"
 import { default as sqlite3InitModule } from "@sqlite.org/sqlite-wasm"
+import { DbTables } from './src/DbTables.js';
+
 
 const sqlite3 = await sqlite3InitModule();
 console.log("Loaded sqlite3", sqlite3);
@@ -8,41 +9,18 @@ const db = new sqlite3.oo1.JsStorageDb("local");
 window.db = db;
 
 function showTables() {
-  const tablesSectionList = /** @type {HTMLUListElement} */ (document.querySelector('#tables > ul'));
-  const tableTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector('#table-template'));
   const tableNames = /** @type {String[]} */ (db.selectValues(`select name from sqlite_master where type='table'`));
-  for (const tableName of tableNames) {
-    const clone = /** @type {DocumentFragment} */ (tableTemplate.content.cloneNode(true));
-    const caption = /** @type {HTMLTableCaptionElement} */ (clone.querySelector('caption'));
-    caption.textContent = tableName;
-    const headerRow = /** @type {HTMLTableRowElement} */ (clone.querySelector('thead > tr'));
-
-    const columnNames = /** @type {String[]} */ (db.selectValues(`SELECT name FROM pragma_table_info('${tableName}')`));
-    for (const columnName of columnNames) {
-      headerRow.appendChild((() => {
-        const th = document.createElement('th');
-        th.textContent = columnName;
-        return th;
-      })())
+  const dbTables = /** @type {DbTables} */ (document.querySelector('#db-tables'));
+  const myTables /** @type {import("./src/DbTables.js").Table[]} */ = tableNames.map(tableName => {
+    const columns = /** @type {String[]} */ (db.selectValues(`SELECT name FROM pragma_table_info('${tableName}')`));
+    const rows = db.selectObjects(`SELECT ${columns.join(', ')} FROM ${tableName}`).map(row => ({ ...row}))
+    return {
+      name: tableName,
+      columns,
+      rows
     }
-    const tableBody = /** @type {HTMLElement} */ (clone.querySelector('tbody'));
-    const rows = /** @type {Object[]} */ (db.selectObjects(`SELECT ${columnNames.join(' ')} FROM ${tableName}`));
-    for (const row of rows) {
-      tableBody.appendChild((() => {
-        const tr = document.createElement('tr');
-        for (const value of Object.values(row)) {
-          tr.appendChild((() => {
-            const td = document.createElement('td');
-            td.textContent = value;
-            return td;
-          })());
-        }
-        return tr;
-      })());
-    }
-
-    tablesSectionList.appendChild(clone);
-  }
+  });
+  dbTables.tables = myTables;
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", showTables);
@@ -105,6 +83,7 @@ function execSql(e) {
     resultList.insertAdjacentElement('afterbegin', /** @type {Element} */(clone.firstElementChild));
     console.log(result);
     sqlField.value = '';
+    showTables();
   } catch (e) {
     switch (true) {
       case e instanceof sqlite3.SQLite3Error:
@@ -159,6 +138,7 @@ function importDb() {
     const arrayBuffer = /** @type {ArrayBuffer} */(this.result);
     const p = sqlite3.wasm.allocFromTypedArray(arrayBuffer);
     const memDb = new sqlite3.oo1.DB();
+    memDb.onclose = {after: function(){sqlite3.wasm.dealloc(p)}};
     const rc = sqlite3.capi.sqlite3_deserialize(
         /** @type {Number} */(memDb.pointer), 'main', p, arrayBuffer.byteLength, arrayBuffer.byteLength,
       sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE
@@ -167,6 +147,8 @@ function importDb() {
 
     try {
       memDb.exec("VACUUM INTO 'file:local?vfs=kvvfs'");
+      showTables();
+      loadDbForm.value = '';
     } catch (e) {
       switch (true) {
         case e instanceof sqlite3.SQLite3Error:
@@ -176,6 +158,8 @@ function importDb() {
         default:
           throw e;
       }
+    } finally {
+      memDb.close();
     }
 
   });
@@ -189,6 +173,7 @@ function clearDb() {
 
   if (result) {
     db.clearStorage();
+    showTables();
   }
 }
 // @ts-ignore

@@ -13,25 +13,14 @@
     <ul>
       <li><button onclick="exportDb()">exportDb</button></li>
       <li><button onclick="clearDb()">clearDb</button></li>
-      <li><input type='file' id='load-db' onchange="importDb()"/></li>
+      <li><form onsubmit="return false"><input type='file' id='load-db' /><button onclick="importDb()">importDb</button></form></li>
     </ul>
   </nav>
-  <section id="tables">
-    <ul>
-    </ul>
-    <template id="table-template">
-      <li>
-        <table>
-          <caption></caption>
-          <thead>
-            <tr></tr>
-          </thead>
-          <tbody>
-          </tbody>
-        </table>
-      </li>
-    </template>
+
+  <section>
+    <db-tables id="db-tables" />
   </section>
+
   <section>
     <form onsubmit="execSql(); return false;">
       <input id="sql-text"><button>exec</button>
@@ -54,7 +43,7 @@
     {
       "imports": {
         "@sqlite.org/sqlite-wasm": "https://unpkg.com/@sqlite.org/sqlite-wasm@3.44.2-build1/sqlite-wasm/jswasm/sqlite3.mjs",
-        "gridjs": "https://unpkg.com/gridjs?module"
+        "lit":"https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js"
       }
     }
   </script>
