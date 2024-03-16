@@ -1,21 +1,109 @@
-import { default as sqlite3InitModule } from "@sqlite.org/sqlite-wasm"
 import { DbTables } from './src/DbTables.js';
 import { DbTable } from "./src/DbTable.js";
 import { html, render } from "lit";
+import promiserFactory from './sqlite3-worker1-promiser.mjs';
 
 
-const sqlite3 = await sqlite3InitModule();
-console.log("Loaded sqlite3", sqlite3);
-const db = new sqlite3.oo1.JsStorageDb("local");
+const database = new URL(window.location.href).searchParams.get('database');
+if (database == null) {
+  throw 'database did not specify'
+}
+
+/** @type {Map<string, Function>} */
+const messageCbQueue = new Map();;
+
+/** @type {Worker} */
+const worker = await new Promise((resolve, reject) => {
+  const worker = new Worker(`worker.js?database=${database}`, { type: 'module' });
+  worker.onmessage = (ev) => {
+    switch (ev.data?.type) {
+      case 'sqlite3-api':
+        const result = ev.data?.result;
+        if (result !== 'worker1-ready') {
+          throw 'worker1 is not ready';
+        }
+        resolve(worker);
+        break;
+      case 'exec':
+      case 'selectValues':
+      case 'selectObjects':
+        const messageId = ev.data?.messageId;
+        if(typeof messageId !== 'string') {
+          throw 'Illegal messageId';
+        }
+        const cb = messageCbQueue.get(messageId);
+        if(typeof cb !== 'function') {
+          throw `not found callback for ${messageId}`
+        }
+        messageCbQueue.delete(messageId);
+        cb(ev.data?.result);
+        break;
+      default:
+        throw 'unhandle message';
+    }
+  };
+});
+//const promiser = await promiserFactory({ worker: () => (new Worker(`worker.js?database=${database}`, { type: 'module' })) });
+
+//const result = await promiser('open', { filename: `${database}.sqlite3` });
+/**
+ * @param {string} type 
+ * @param {object} args 
+ */
+const postMessage = async (type, args) => {
+  const result = await new Promise((resolve) => {
+    const messageId = crypto.randomUUID();
+    messageCbQueue.set(messageId, (result) => {
+      resolve(result);
+    });
+    worker.postMessage({
+      type,
+      messageId,
+      args
+    });
+  });
+  return result;
+};
+
+class WokerProxyDb {
+  /**
+   * @param {Worker} worker 
+   */
+  constructor(worker) {
+    this.worker = worker;
+  }
+
+
+  async exec(sql) {
+    await postMessage('exec', sql);
+  }
+
+  async selectObjects(sql, bind=undefined) {
+    return await postMessage('selectObjects', { sql, bind });
+  }
+  async selectValues(sql, bind=undefined) {
+    return await postMessage('selectValues', { sql, bind });
+  }
+}
+
+const db = new WokerProxyDb(worker);
+
+await db.exec('create table if not exists t(a,b)');
+console.log(`exec,{ sql: 'create table if not exists t(a,b)' }}`);
+await db.exec('insert into t(a,b) values (1,2)');
+console.log(`exec,{ sql: 'insert into t(a,b) values (1,2)' }}`);
+const result = await db.selectObjects('insert into t(a,b) values (1,2)');
+console.log(`exec,{ sql: 'select * from t' }}→result=${JSON.stringify(result)}`);
+
 // @ts-ignore
 window.db = db;
 
-function showTables() {
-  const tableNames = /** @type {String[]} */ (db.selectValues(`select name from sqlite_master where type='table'`));
+async function showTables() {
+  const tableNames = /** @type {String[]} */ (await db.selectValues(`select name from sqlite_master where type='table'`));
   const dbTables = /** @type {DbTables} */ (document.querySelector('#db-tables'));
-  const myTables /** @type {import("./src/DbTables.js").Table[]} */ = tableNames.map(tableName => {
-    const columns = /** @type {String[]} */ (db.selectValues(`SELECT name FROM pragma_table_info('${tableName}')`));
-    const rows = db.selectObjects(`SELECT ${columns.join(', ')} FROM ${tableName}`).map(row => ({ ...row }))
+  const myTables /** @type {import("./src/DbTables.js").Table[]} */ = tableNames.map(async tableName => {
+    const columns = /** @type {String[]} */ await db.selectValues(`SELECT name FROM pragma_table_info('${tableName}')`);
+    const rows = (await db.selectObjects(`SELECT ${columns.join(', ')} FROM ${tableName}`)).map(row => ({ ...row }))
     return {
       name: tableName,
       columns,
@@ -27,7 +115,7 @@ function showTables() {
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", showTables);
 } else {
-  showTables();
+  await showTables();
 }
 
 
